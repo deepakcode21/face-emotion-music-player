@@ -1,4 +1,4 @@
-# Moodify - Emotion Based Music Recommendation System
+# Emotion Based Music Recommendation System
 
 ![Project Banner](https://github.com/user-attachments/assets/fde116a4-c646-4f86-b02d-67cf6d8a0743) 
 

@@ -5,55 +5,170 @@ import MoodCamera from './components/MoodCamera';
 import SpotifyPlayer from './components/SpotifyPlayer';
 import { RefreshCw, ScanFace } from 'lucide-react';
 
-const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
-const CLIENT_SECRET = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET;
-const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+
+// ===============================
+// ✅ PKCE HELPERS
+// ===============================
+function generateRandomString(length = 64) {
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let text = "";
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return hash;
+}
+
+function base64encode(input) {
+  return btoa(String.fromCharCode(...new Uint8Array(input)))
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+// ===============================
 
 function App() {
   const [appToken, setAppToken] = useState("");
   const [playlistId, setPlaylistId] = useState(null);
   const [currentLogic, setCurrentLogic] = useState("");
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
 
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+
+  // ====================================
+  // ✅ 1. HANDLE REDIRECT + EXCHANGE CODE
+  // ====================================
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash) {
-      const token = hash.substring(1).split("&").find(elem => elem.startsWith("access_token"));
-      if (token) {
-        window.location.hash = "";
-        setIsUserLoggedIn(true);
-        localStorage.setItem("spotify_user_login", "true");
-      }
-    } else if (localStorage.getItem("spotify_user_login") === "true") {
-      setIsUserLoggedIn(true);
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+
+    if (code) {
+      exchangeToken(code);
+      window.history.replaceState({}, document.title, "/");
     }
 
+    const storedToken = localStorage.getItem("spotify_user_token");
+    if (storedToken) {
+      setIsUserLoggedIn(true);
+      fetchUserProfile(storedToken);
+    }
+
+    // ✅ APP TOKEN FOR SEARCH
     const getAppToken = async () => {
-      try {
-        const result = await fetch('https://accounts.spotify.com/api/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': 'Basic ' + btoa(CLIENT_ID + ':' + CLIENT_SECRET)
-          },
-          body: 'grant_type=client_credentials'
-        });
-        const data = await result.json();
-        setAppToken(data.access_token);
-      } catch (error) { console.error("Token Error:", error); }
+      const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
+      const CLIENT_SECRET = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET;
+
+      const res = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: "Basic " + btoa(CLIENT_ID + ":" + CLIENT_SECRET),
+        },
+        body: "grant_type=client_credentials",
+      });
+
+      const data = await res.json();
+      setAppToken(data.access_token);
     };
+
     getAppToken();
   }, []);
 
-  const handleLogin = () => {
-    const scopes = "streaming user-read-email user-read-private";
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${encodeURIComponent(scopes)}&response_type=token&show_dialog=true`;
+  // ====================================
+  // ✅ 2. LOGIN (PKCE)
+  // ====================================
+  const handleLogin = async () => {
+    const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
+    const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+
+    const verifier = generateRandomString(128);
+    const challenge = base64encode(await sha256(verifier));
+
+    localStorage.setItem("spotify_code_verifier", verifier);
+
+    const scopes = [
+      "user-read-email",
+      "user-read-private",
+      "streaming",
+      "user-read-playback-state",
+      "user-modify-playback-state",
+    ].join(" ");
+
+    const authUrl =
+      `https://accounts.spotify.com/authorize` +
+      `?client_id=${CLIENT_ID}` +
+      `&response_type=code` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+      `&scope=${encodeURIComponent(scopes)}` +
+      `&code_challenge_method=S256` +
+      `&code_challenge=${challenge}`;
+
     window.location.href = authUrl;
   };
 
+  // ====================================
+  // ✅ 3. EXCHANGE CODE → TOKEN
+  // ====================================
+  const exchangeToken = async (code) => {
+    const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
+    const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
+    const verifier = localStorage.getItem("spotify_code_verifier");
+
+    const res = await fetch("https://accounts.spotify.com/api/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: CLIENT_ID,
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: verifier,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.access_token) {
+      localStorage.setItem("spotify_user_token", data.access_token);
+      setIsUserLoggedIn(true);
+      fetchUserProfile(data.access_token);
+    }
+  };
+
+  // ====================================
+  // ✅ 4. FETCH USER PROFILE
+  // ====================================
+  const fetchUserProfile = async (token) => {
+    try {
+      const res = await fetch("https://api.spotify.com/v1/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        handleLogout();
+        return;
+      }
+
+      const data = await res.json();
+      console.log("✅ USER PROFILE:", data);
+      setUserProfile(data);
+    } catch (e) {
+      console.error("PROFILE ERROR", e);
+    }
+  };
+
   const handleLogout = () => {
+    localStorage.removeItem("spotify_user_token");
     setIsUserLoggedIn(false);
-    localStorage.removeItem("spotify_user_login");
+    setUserProfile(null);
     window.location.href = "/";
   };
 
@@ -109,6 +224,7 @@ function App() {
 
       <Navbar 
         isUserLoggedIn={isUserLoggedIn} 
+        userProfile={userProfile}
         onLogin={handleLogin} 
         onLogout={handleLogout} 
       />

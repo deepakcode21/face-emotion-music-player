@@ -11,7 +11,7 @@ import {
   Wind,
 } from "lucide-react";
 
-const Navbar = ({ isUserLoggedIn, onLogin, onLogout }) => {
+const Navbar = ({ isUserLoggedIn, userProfile, onLogin, onLogout }) => {
   const [time, setTime] = useState(new Date());
   // Added 'aqi' to state
   const [weather, setWeather] = useState({
@@ -179,27 +179,61 @@ const Navbar = ({ isUserLoggedIn, onLogin, onLogout }) => {
         </div>
 
         <div className="flex items-center gap-4 relative z-10">
-          {isUserLoggedIn ? (
-            <button
-              onClick={onLogout}
-              className="group flex items-center gap-2 bg-zinc-900 border border-white/10 text-zinc-300 hover:bg-green-400 px-4 py-2 rounded-full text-xs font-bold hover:text-red-400 hover:border-red-500/50 transition-all overflow-hidden relative"
-            >
-              <div className="absolute inset-0 bg-red-500/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-              <LogOut size={14} className="relative z-10" />
-              <span className="hidden lg:inline relative z-10">Logout</span>
-            </button>
+          {isUserLoggedIn && userProfile ? (
+            <div className="group relative">
+
+              {/* ✅ PROFILE BUTTON */}
+              <button className="flex items-center gap-3 bg-zinc-900 border border-white/10 pl-2 pr-4 py-1.5 rounded-full hover:bg-zinc-800 transition-all">
+                
+                {/* ✅ IMAGE SAFE GUARD */}
+                {userProfile?.images?.[0]?.url ? (
+                  <img
+                    src={userProfile.images[0].url}
+                    alt="User"
+                    className="w-7 h-7 rounded-full border border-green-500 object-cover"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center text-black font-bold text-xs">
+                    {userProfile?.display_name?.charAt(0) || "U"}
+                  </div>
+                )}
+
+                {/* ✅ NAME SAFE GUARD */}
+                <span className="text-xs font-bold text-white max-w-[100px] truncate">
+                  {userProfile?.display_name || "Spotify User"}
+                </span>
+              </button>
+
+              {/* ✅ DROPDOWN */}
+              <div className="absolute right-0 top-full mt-2 w-44 bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right">
+                <div className="px-4 py-3 border-b border-white/5">
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                    Logged In As
+                  </p>
+                  <p className="text-xs font-bold text-white truncate">
+                    {userProfile?.display_name || "Spotify User"}
+                  </p>
+                  {userProfile?.email && (
+                    <p className="text-[10px] text-zinc-500 truncate mt-1">
+                      {userProfile.email}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={onLogout}
+                  className="w-full flex items-center gap-2 px-4 py-3 text-xs font-bold text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                >
+                  <LogOut size={14} /> Logout
+                </button>
+              </div>
+            </div>
           ) : (
             <button
               onClick={onLogin}
-              className="group flex items-center gap-2 bg-white text-black px-5 py-2 hover:bg-green-400 rounded-full text-xs font-bold hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.3)] relative overflow-hidden"
+              className="flex items-center gap-2 bg-white text-black px-5 py-2 rounded-full text-xs font-bold hover:scale-105 transition-transform shadow-[0_0_20px_rgba(255,255,255,0.3)]"
             >
-              <span className="absolute inset-0 bg-linear-to-r from-transparent via-zinc-200 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></span>
-              <img
-                src="https://img.icons8.com/ios-filled/50/spotify.png"
-                alt="Spotify"
-                className="w-4 h-4 object-contain"
-              />
-              Spotify Login
+              <LogIn size={14} /> Login
             </button>
           )}
         </div>

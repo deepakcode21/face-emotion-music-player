@@ -181,11 +181,7 @@ const Navbar = ({ isUserLoggedIn, userProfile, onLogin, onLogout }) => {
         <div className="flex items-center gap-4 relative z-10">
           {isUserLoggedIn && userProfile ? (
             <div className="group relative">
-
-              {/* ✅ PROFILE BUTTON */}
               <button className="flex items-center gap-3 bg-zinc-900 border border-white/10 pl-2 pr-4 py-1.5 rounded-full hover:bg-zinc-800 transition-all">
-                
-                {/* ✅ IMAGE SAFE GUARD */}
                 {userProfile?.images?.[0]?.url ? (
                   <img
                     src={userProfile.images[0].url}
@@ -197,14 +193,10 @@ const Navbar = ({ isUserLoggedIn, userProfile, onLogin, onLogout }) => {
                     {userProfile?.display_name?.charAt(0) || "U"}
                   </div>
                 )}
-
-                {/* ✅ NAME SAFE GUARD */}
                 <span className="text-xs font-bold text-white max-w-[100px] truncate">
                   {userProfile?.display_name || "Spotify User"}
                 </span>
               </button>
-
-              {/* ✅ DROPDOWN */}
               <div className="absolute right-0 top-full mt-2 w-44 bg-[#0a0a0a] border border-white/10 rounded-xl shadow-2xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right">
                 <div className="px-4 py-3 border-b border-white/5">
                   <p className="text-[10px] text-zinc-500 uppercase tracking-wider">

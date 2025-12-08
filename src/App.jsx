@@ -7,7 +7,7 @@ import { RefreshCw, ScanFace } from 'lucide-react';
 
 
 // ===============================
-// ✅ PKCE HELPERS
+// PKCE HELPERS
 // ===============================
 function generateRandomString(length = 64) {
   const possible =
@@ -44,7 +44,7 @@ function App() {
   const [userProfile, setUserProfile] = useState(null);
 
   // ====================================
-  // ✅ 1. HANDLE REDIRECT + EXCHANGE CODE
+  // 1. HANDLE REDIRECT + EXCHANGE CODE
   // ====================================
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -61,7 +61,7 @@ function App() {
       fetchUserProfile(storedToken);
     }
 
-    // ✅ APP TOKEN FOR SEARCH
+    // APP TOKEN FOR SEARCH
     const getAppToken = async () => {
       const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
       const CLIENT_SECRET = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET;
@@ -83,7 +83,7 @@ function App() {
   }, []);
 
   // ====================================
-  // ✅ 2. LOGIN (PKCE)
+  // 2. LOGIN (PKCE)
   // ====================================
   const handleLogin = async () => {
     const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
@@ -115,7 +115,7 @@ function App() {
   };
 
   // ====================================
-  // ✅ 3. EXCHANGE CODE → TOKEN
+  // 3. EXCHANGE CODE → TOKEN
   // ====================================
   const exchangeToken = async (code) => {
     const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
@@ -144,7 +144,7 @@ function App() {
   };
 
   // ====================================
-  // ✅ 4. FETCH USER PROFILE
+  // 4. FETCH USER PROFILE
   // ====================================
   const fetchUserProfile = async (token) => {
     try {
@@ -158,7 +158,6 @@ function App() {
       }
 
       const data = await res.json();
-      console.log("✅ USER PROFILE:", data);
       setUserProfile(data);
     } catch (e) {
       console.error("PROFILE ERROR", e);

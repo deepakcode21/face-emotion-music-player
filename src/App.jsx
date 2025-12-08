@@ -5,13 +5,11 @@ import MoodCamera from './components/MoodCamera';
 import SpotifyPlayer from './components/SpotifyPlayer';
 import { RefreshCw, ScanFace } from 'lucide-react';
 
-
 // ===============================
 // PKCE HELPERS
 // ===============================
 function generateRandomString(length = 64) {
-  const possible =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let text = "";
   for (let i = 0; i < length; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
@@ -39,13 +37,9 @@ function App() {
   const [appToken, setAppToken] = useState("");
   const [playlistId, setPlaylistId] = useState(null);
   const [currentLogic, setCurrentLogic] = useState("");
-
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
 
-  // ====================================
-  // 1. HANDLE REDIRECT + EXCHANGE CODE
-  // ====================================
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
@@ -61,7 +55,6 @@ function App() {
       fetchUserProfile(storedToken);
     }
 
-    // APP TOKEN FOR SEARCH
     const getAppToken = async () => {
       const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
       const CLIENT_SECRET = import.meta.env.VITE_SPOTIFY_CLIENT_SECRET;
@@ -82,16 +75,11 @@ function App() {
     getAppToken();
   }, []);
 
-  // ====================================
-  // 2. LOGIN (PKCE)
-  // ====================================
   const handleLogin = async () => {
     const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
     const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
-
     const verifier = generateRandomString(128);
     const challenge = base64encode(await sha256(verifier));
-
     localStorage.setItem("spotify_code_verifier", verifier);
 
     const scopes = [
@@ -114,9 +102,6 @@ function App() {
     window.location.href = authUrl;
   };
 
-  // ====================================
-  // 3. EXCHANGE CODE → TOKEN
-  // ====================================
   const exchangeToken = async (code) => {
     const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
     const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
@@ -135,7 +120,6 @@ function App() {
     });
 
     const data = await res.json();
-
     if (data.access_token) {
       localStorage.setItem("spotify_user_token", data.access_token);
       setIsUserLoggedIn(true);
@@ -143,20 +127,15 @@ function App() {
     }
   };
 
-  // ====================================
-  // 4. FETCH USER PROFILE
-  // ====================================
   const fetchUserProfile = async (token) => {
     try {
       const res = await fetch("https://api.spotify.com/v1/me", {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) {
         handleLogout();
         return;
       }
-
       const data = await res.json();
       setUserProfile(data);
     } catch (e) {
@@ -178,7 +157,6 @@ function App() {
 
   const handleMoodDetected = async (mood, age) => {
     if (!appToken) return;
-
     let vibe = "";
     let era = "";
 
@@ -214,11 +192,11 @@ function App() {
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col font-sans selection:bg-green-500 selection:text-black overflow-x-hidden bg-[#050505] text-white">
+    <div className="relative min-h-[100dvh] flex flex-col font-sans selection:bg-green-500 selection:text-black overflow-x-hidden bg-[#050505] text-white">
       <div className="fixed inset-0 -z-10 h-full w-full">
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5"></div>
-        <div className="absolute top-[-20%] left-[20%] w-[600px] h-[600px] bg-green-900/10 rounded-full blur-[120px] pointer-events-none"></div>
-        <div className="absolute bottom-[-20%] right-[20%] w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[120px] pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-5 hidden md:block"></div>
+        <div className="absolute top-[-20%] left-[20%] w-[600px] h-[600px] bg-green-900/10 rounded-full blur-[60px] md:blur-[120px] pointer-events-none"></div>
+        <div className="absolute bottom-[-20%] right-[20%] w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[60px] md:blur-[120px] pointer-events-none"></div>
       </div>
 
       <Navbar 
@@ -230,20 +208,16 @@ function App() {
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 pt-28 pb-12 flex flex-col">
         {!isUserLoggedIn && (
-           <div className="mb-8 mx-auto max-w-2xl p-3 rounded-full bg-yellow-500/5 border border-yellow-500/20 text-yellow-200/80 text-xs flex items-center justify-center gap-2 backdrop-blur-md">
+           <div className="mb-8 mx-auto max-w-2xl p-3 rounded-full bg-yellow-500/5 border border-yellow-500/20 text-yellow-200/80 text-xs flex items-center justify-center gap-2 backdrop-blur-none md:backdrop-blur-md">
              <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
              <p>Guest Mode: 30s previews only. Login into your spotify account for full playback.</p>
            </div>
         )}
 
-        {/* ==============================================
-            MOBILE VIEW (Special Layout)
-            ==============================================
-        */}
+        {/* MOBILE VIEW */}
         <div className="lg:hidden flex flex-col gap-6 mb-12">
             {!playlistId && (
-                <div className="relative w-full h-[550px]">
-                    <div className="absolute -inset-1 bg-linear-to-r from-green-500/20 to-transparent rounded-4xl blur-xl opacity-40 -z-10"></div>
+                <div className="relative w-full h-[500px]">
                     <MoodCamera onMoodDetected={handleMoodDetected} onReset={handleReset} />
                 </div>
             )}
@@ -268,17 +242,13 @@ function App() {
                         </div>
                     </button>
                     <div className="relative w-full h-[600px] animate-in slide-in-from-bottom-10 duration-700 fade-in">
-                        <div className="absolute -inset-1 bg-linear-to-l from-green-500/20 to-transparent rounded-4xl blur-xl opacity-40 -z-10"></div>
                         <SpotifyPlayer playlistId={playlistId} logicText={currentLogic} />
                     </div>
                 </>
             )}
         </div>
 
-        {/* ==============================================
-            DESKTOP VIEW (Standard Grid)
-            ==============================================
-        */}
+        {/* DESKTOP VIEW */}
         <div className="hidden lg:grid lg:grid-cols-2 gap-12 lg:h-[650px] mb-16 items-center">
            <div className="relative group w-full h-full">
               <div className="absolute -inset-1 bg-linear-to-r from-green-500/20 to-transparent rounded-4xl blur-xl opacity-40 group-hover:opacity-60 transition duration-1000 -z-10"></div>
@@ -291,7 +261,6 @@ function App() {
         </div>
 
         <Footer />
-
       </main>
     </div>
   );

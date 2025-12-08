@@ -16,6 +16,9 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
   const [detectedMood, setDetectedMood] = useState(null);
   const [detectedAge, setDetectedAge] = useState(null);
 
+  const isProcessingRef = useRef(false);
+  const streamRef = useRef(null);
+
   useEffect(() => {
     const loadModels = async () => {
       const MODEL_URL = "/models";
@@ -27,10 +30,13 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
         ]);
         setIsModelLoaded(true);
       } catch (e) {
-        console.error(e);
+        console.error("Model Load Error:", e);
       }
     };
     loadModels();
+    return () => {
+      stopCamera();
+    };
   }, []);
 
   const startCamera = async () => {
@@ -38,32 +44,61 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
     setDetectedMood(null);
     setDetectedAge(null);
     setIsCameraOn(true);
+    isProcessingRef.current = false;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      const constraints = {
+        video: {
+          width: { ideal: 480 },
+          height: { ideal: 360 },
+          facingMode: "user",
+        },
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
     } catch (err) {
+      console.error("Camera Error:", err);
       setIsCameraOn(false);
     }
   };
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach((t) => t.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setIsCameraOn(false);
+    isProcessingRef.current = false;
   };
+  const runDetectionLoop = async () => {
+    if (
+      !videoRef.current ||
+      !streamRef.current ||
+      videoRef.current.paused ||
+      videoRef.current.ended
+    ) {
+      return;
+    }
+    if (isProcessingRef.current) return;
 
-  const handleVideoPlay = () => {
-    const interval = setInterval(async () => {
-      if (!videoRef.current || !isCameraOn) {
-        clearInterval(interval);
-        return;
-      }
+    isProcessingRef.current = true;
+
+    try {
+      const options = new faceapi.TinyFaceDetectorOptions({
+        inputSize: 224,
+        scoreThreshold: 0.5,
+      });
 
       const detections = await faceapi
-        .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .detectAllFaces(videoRef.current, options)
         .withFaceExpressions()
         .withAgeAndGender();
 
@@ -71,6 +106,7 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
         const data = detections[0];
         const expressions = data.expressions;
         const age = Math.round(data.age);
+
         const maxMood = Object.keys(expressions).reduce((a, b) =>
           expressions[a] > expressions[b] ? a : b
         );
@@ -80,14 +116,26 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
           setDetectedAge(age);
           onMoodDetected(maxMood, age);
           stopCamera();
-          clearInterval(interval);
+          return;
         }
       }
-    }, 500);
+    } catch (error) {
+      console.log("Detection glitches (normal on mobile startup)");
+    }
+
+    isProcessingRef.current = false;
+    if (isCameraOn && !detectedMood) {
+      setTimeout(() => requestAnimationFrame(runDetectionLoop), 100);
+    }
+  };
+
+  const handleVideoPlay = () => {
+    // Start the loop once video starts playing
+    runDetectionLoop();
   };
 
   return (
-    <div className="glass-panel border-green-400/80 rounded-3xl p-1  flex flex-col h-full w-full overflow-hidden relative hover:border-green-500/40 transition-all duration-500 group bg-[#0a0a0a]">
+    <div className="glass-panel border-green-400/80 rounded-3xl p-1 flex flex-col h-full w-full overflow-hidden relative hover:border-green-500/40 transition-all duration-500 group bg-[#0a0a0a]">
       <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none z-0 mix-blend-overlay"></div>
       <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_50%,rgba(0,0,0,0.4)_50%)] bg-size-[100%_4px] pointer-events-none z-10 opacity-10"></div>
       <div className="px-6 py-4 flex justify-between items-center border-b-green-400 border-b border-white/5 bg-black/40 z-20 relative backdrop-blur-md">
@@ -121,6 +169,7 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
             ref={videoRef}
             autoPlay
             muted
+            playsInline // IMPORTANT FOR IPHONE/MOBILE
             onPlay={handleVideoPlay}
             className={`w-full h-full object-cover transform scale-x-[-1] transition-opacity duration-500 ${
               isCameraOn ? "opacity-100" : "opacity-0 absolute"
@@ -134,6 +183,9 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
                 NEURAL_NET_ACTIVE
               </div>
+              <div className="absolute bottom-4 left-4 text-green-500/50 font-mono text-[8px]">
+                INPUT: 224x224 | MODEL: TINY_YOLO
+              </div>
 
               <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-green-500/50 rounded-tl-lg"></div>
               <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-green-500/50 rounded-tr-lg"></div>
@@ -146,7 +198,6 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
         </div>
         {!isCameraOn && !detectedMood && (
           <div className="z-20 text-center p-6 max-w-sm relative flex flex-col items-center">
-            {/* Background Glow Blob */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-green-500/10 rounded-full blur-[80px] animate-pulse pointer-events-none"></div>
 
             {isModelLoaded ? (
@@ -169,11 +220,9 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
 
                 <button
                   onClick={startCamera}
-                  className="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-3 bg-white/10 backdrop-blur-xl border border-white/20 text-white relative overflow-hidden transition-all hover:bg-green-500/20 hover:border-green-400/40 hover:scale-[1.05] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)]"
+                  className="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-3 bg-white/10 backdrop-blur-xl border border-white/20 text-white relative overflow-hidden transition-all hover:bg-green-500/20 hover:border-green-400/40 hover:scale-[1.05] hover:shadow-[0_0_35px_rgba(34,197,94,0.6)] cursor-pointer"
                 >
                   <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] hover:translate-x-[200%] transition-transform duration-700"></span>
-                  <span className="absolute inset-0 bg-linear-to-r from-transparent via-green-300/40 to-transparent translate-x-[-200%] hover:translate-x-[200%] transition-transform duration-700 delay-200"></span>
-
                   <Play size={20} className="relative z-10" />
                   <span className="tracking-wide relative z-10">
                     INITIATE SCAN
@@ -195,7 +244,6 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
         )}
         {!isCameraOn && detectedMood && (
           <div className="z-20 text-center animate-in zoom-in duration-300 p-8 w-full h-full bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center relative">
-            {/* Success Ring Animation */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-[300px] h-[300px] border border-green-500/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
               <div className="w-[200px] h-[200px] border border-green-500/10 rounded-full absolute animate-[ping_3s_linear_infinite]"></div>
@@ -228,7 +276,7 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
 
             <button
               onClick={startCamera}
-              className="group bg-zinc-900 text-white px-8 py-3 rounded-full text-sm font-bold border border-white/10 hover:border-green-500/50 hover:text-green-400 transition-all flex items-center gap-2 hover:bg-black"
+              className="group bg-zinc-900 text-white px-8 py-3 rounded-full text-sm font-bold border border-white/10 hover:border-green-500/50 hover:text-green-400 transition-all flex items-center gap-2 hover:bg-black cursor-pointer"
             >
               <RefreshCw
                 size={16}

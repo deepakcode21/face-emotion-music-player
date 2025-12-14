@@ -35,3 +35,7 @@
 .animate-scan {
   animation: scan-line 2s linear infinite;
 }
+@keyframes music-bar {
+  0% { height: 10%; opacity: 0.5; }
+  100% { height: 80%; opacity: 1; }
+}

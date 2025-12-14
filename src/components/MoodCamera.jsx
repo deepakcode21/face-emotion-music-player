@@ -7,6 +7,8 @@ import {
   Loader2,
   ScanFace,
   CheckCircle2,
+  Edit3,
+  X,
 } from "lucide-react";
 
 const MoodCamera = ({ onMoodDetected, onReset }) => {
@@ -15,9 +17,20 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [detectedMood, setDetectedMood] = useState(null);
   const [detectedAge, setDetectedAge] = useState(null);
+  const [showManualSelect, setShowManualSelect] = useState(false);
 
   const isProcessingRef = useRef(false);
   const streamRef = useRef(null);
+
+  const MOOD_LIST = [
+    { label: "happy", emoji: "⚡" },
+    { label: "sad", emoji: "🌧️" },
+    { label: "angry", emoji: "🔥" },
+    { label: "fearful", emoji: "😨" },
+    { label: "disgusted", emoji: "🤢" },
+    { label: "surprised", emoji: "😲" },
+    { label: "neutral", emoji: "😐" },
+  ];
 
   useEffect(() => {
     const loadModels = async () => {
@@ -43,6 +56,7 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
     if (onReset) onReset();
     setDetectedMood(null);
     setDetectedAge(null);
+    setShowManualSelect(false); // Reset manual mode
     setIsCameraOn(true);
     isProcessingRef.current = false;
 
@@ -129,8 +143,16 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
     }
   };
 
+  const handleManualOverride = (mood) => {
+    setDetectedMood(mood);
+    setShowManualSelect(false);
+    // Use previously detected age or default to 25 if manual select happened before detection
+    const ageToUse = detectedAge || 25;
+    setDetectedAge(ageToUse);
+    onMoodDetected(mood, ageToUse);
+  };
+
   const handleVideoPlay = () => {
-    // Start the loop once video starts playing
     runDetectionLoop();
   };
 
@@ -149,9 +171,7 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
         <div className="flex items-center gap-2">
           <span
             className={`w-2 h-2 rounded-full ${
-              isCameraOn
-                ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"
-                : "bg-zinc-600"
+              isCameraOn ? "bg-red-500 animate-pulse" : "bg-zinc-600"
             }`}
           ></span>
           <span
@@ -159,7 +179,7 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
               isCameraOn ? "text-red-400" : "text-zinc-500"
             }`}
           >
-            {isCameraOn ? "LIVE FEED" : detectedMood ? "LOCKED" : "STANDBY"}
+            {isCameraOn ? "LIVE" : detectedMood ? "LOCKED" : "STANDBY"}
           </span>
         </div>
       </div>
@@ -250,14 +270,8 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
             </div>
 
             <div className="w-28 h-28 bg-green-500/10 border border-green-500/30 rounded-full flex items-center justify-center mb-6 shadow-[0_0_50px_rgba(34,197,94,0.2)] relative z-10">
-              <span className="text-6xl drop-shadow-lg">
-                {detectedMood === "happy"
-                  ? "⚡"
-                  : detectedMood === "sad"
-                  ? "🌧️"
-                  : detectedMood === "angry"
-                  ? "🔥"
-                  : "✨"}
+              <span className="text-6xl mb-6">
+                {MOOD_LIST.find((m) => m.label === detectedMood)?.emoji || "✨"}
               </span>
             </div>
 
@@ -284,6 +298,44 @@ const MoodCamera = ({ onMoodDetected, onReset }) => {
               />{" "}
               RE-CALIBRATE
             </button>
+            <button
+              onClick={() => setShowManualSelect(true)}
+              className="w-full bg-transparent text-zinc-500 px-8 py-2 rounded-xl text-xs font-mono hover:text-white transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Edit3 size={12} /> WRONG VIBE? CHANGE IT
+            </button>
+          </div>
+        )}
+        {showManualSelect && (
+          <div className="z-30 absolute inset-0 bg-black p-6 flex flex-col animate-in fade-in slide-in-from-bottom-10 duration-300">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-white font-bold text-lg">Select Your Vibe</h3>
+              <button
+                onClick={() => setShowManualSelect(false)}
+                className="p-2 bg-zinc-900 rounded-full text-zinc-400 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 overflow-y-auto pb-4">
+              {MOOD_LIST.map((mood) => (
+                <button
+                  key={mood.label}
+                  onClick={() => handleManualOverride(mood.label)}
+                  className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all cursor-pointer ${
+                    detectedMood === mood.label
+                      ? "bg-green-500/20 border-green-500 text-white"
+                      : "bg-zinc-900 border-white/5 text-zinc-400 hover:bg-zinc-800 hover:border-white/20"
+                  }`}
+                >
+                  <span className="text-2xl">{mood.emoji}</span>
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {mood.label}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
